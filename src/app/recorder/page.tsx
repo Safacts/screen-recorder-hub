@@ -209,7 +209,7 @@ export default function RecorderPage() {
     window.location.href = "/api/auth";
   }, []);
 
-  async function uploadFile(accessToken: string, blob: Blob, name: string, mime: string) {
+  async function uploadFile(accessToken: string, blob: Blob, name: string, mime: string, folderId: string) {
     const fileRes = await fetch("https://www.googleapis.com/drive/v3/files", {
       method: "POST",
       headers: {
@@ -253,11 +253,11 @@ export default function RecorderPage() {
       const { accessToken, folderId } = await res.json();
 
       const timestamp = Date.now();
-      await uploadFile(accessToken, recordedBlob, `recording-${timestamp}.webm`, "video/webm");
+      await uploadFile(accessToken, recordedBlob, `recording-${timestamp}.webm`, "video/webm", folderId);
 
       if (markers.length > 0) {
         const markersBlob = new Blob([JSON.stringify(markers, null, 2)], { type: "application/json" });
-        await uploadFile(accessToken, markersBlob, `recording-${timestamp}-markers.json`, "application/json");
+        await uploadFile(accessToken, markersBlob, `recording-${timestamp}-markers.json`, "application/json", folderId);
       }
 
       setDriveUploaded(true);
