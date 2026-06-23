@@ -23,6 +23,7 @@ export default function RecorderPage() {
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [screenActive, setScreenActive] = useState(false);
   const [driveAuth, setDriveAuth] = useState<"unauthorized" | "authorized" | "error">("unauthorized");
+  const [driveError, setDriveError] = useState("");
   const [driveUploading, setDriveUploading] = useState(false);
   const [driveUploaded, setDriveUploaded] = useState(false);
 
@@ -78,6 +79,7 @@ export default function RecorderPage() {
       window.history.replaceState({}, "", "/recorder");
     } else if (params.get("drive") === "error") {
       setDriveAuth("error");
+      setDriveError(params.get("details") || "Unknown error");
       window.history.replaceState({}, "", "/recorder");
     }
   }, []);
@@ -267,8 +269,9 @@ export default function RecorderPage() {
       }
 
       setDriveUploaded(true);
-    } catch {
+    } catch (err) {
       setDriveAuth("error");
+      setDriveError(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setDriveUploading(false);
     }
@@ -347,8 +350,8 @@ export default function RecorderPage() {
             </span>
           )}
           {driveAuth === "error" && (
-            <span className="px-6 py-3 bg-red-900 text-red-400 rounded-xl font-medium">
-              Google Drive error — reauthorize
+            <span className="px-6 py-3 bg-red-900 text-red-400 rounded-xl font-medium text-center">
+              Google Drive error — {driveError}
             </span>
           )}
 

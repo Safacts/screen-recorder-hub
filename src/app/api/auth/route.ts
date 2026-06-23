@@ -6,13 +6,9 @@ export async function GET() {
     return NextResponse.json({ error: "Google Drive not configured" }, { status: 500 });
   }
 
-  const REDIRECT_URI = process.env.VERCEL_ENV === "production"
-    ? "https://screen-recorder-hub.vercel.app/api/auth/callback"
-    : "http://localhost:3000/api/auth/callback";
-
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
-    redirect_uri: REDIRECT_URI,
+    redirect_uri: "https://screen-recorder-hub.vercel.app/api/auth/callback",
     response_type: "code",
     scope: "https://www.googleapis.com/auth/drive.file",
     access_type: "offline",
