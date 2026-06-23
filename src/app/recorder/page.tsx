@@ -217,6 +217,7 @@ export default function RecorderPage() {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ name }),
+    });
     if (!fileRes.ok) {
       const err = await fileRes.text();
       throw new Error(`Create ${name} failed: ${err}`);
