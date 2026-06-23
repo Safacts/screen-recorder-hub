@@ -84,7 +84,7 @@ export default function RecorderPage() {
     }
   }, []);
 
-  const startCapture = useCallback(async () => {
+  const startCaptureAndRecord = useCallback(async () => {
     try {
       const screenStream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
@@ -119,6 +119,39 @@ export default function RecorderPage() {
       screenStream.getVideoTracks()[0].addEventListener("ended", () => {
         stopCapture();
       });
+
+      chunksRef.current = [];
+      markerStartTimeRef.current = Date.now();
+      setMarkers([]);
+
+      const recorder = new MediaRecorder(combined, {
+        mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+          ? "video/webm;codecs=vp9"
+          : "video/webm",
+      });
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: "video/webm" });
+        setRecordedBlob(blob);
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+        setElapsed(0);
+      };
+
+      recorder.start(1000);
+      recorderRef.current = recorder;
+      setRecording(true);
+
+      startTimeRef.current = Date.now();
+      timerRef.current = setInterval(() => {
+        setElapsed((Date.now() - startTimeRef.current) / 1000);
+      }, 100);
     } catch (err) {
       console.error("Capture failed:", err);
     }
@@ -134,46 +167,16 @@ export default function RecorderPage() {
     }
     setScreenActive(false);
     if (recording) {
-      stopRecording();
-    }
-  }, [recording]);
-
-  const startRecording = useCallback(() => {
-    if (!streamRef.current) return;
-
-    chunksRef.current = [];
-    markerStartTimeRef.current = Date.now();
-    setMarkers([]);
-
-    const recorder = new MediaRecorder(streamRef.current, {
-      mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-        ? "video/webm;codecs=vp9"
-        : "video/webm",
-    });
-
-    recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunksRef.current.push(e.data);
-    };
-
-    recorder.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: "video/webm" });
-      setRecordedBlob(blob);
+      if (recorderRef.current && recorderRef.current.state !== "inactive") {
+        recorderRef.current.stop();
+      }
+      setRecording(false);
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
-      setElapsed(0);
-    };
-
-    recorder.start(1000);
-    recorderRef.current = recorder;
-    setRecording(true);
-
-    startTimeRef.current = Date.now();
-    timerRef.current = setInterval(() => {
-      setElapsed((Date.now() - startTimeRef.current) / 1000);
-    }, 100);
-  }, []);
+    }
+  }, [recording]);
 
   const stopRecording = useCallback(() => {
     if (recorderRef.current && recorderRef.current.state !== "inactive") {
@@ -184,6 +187,14 @@ export default function RecorderPage() {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setScreenActive(false);
   }, []);
 
   const download = useCallback(() => {
@@ -298,26 +309,15 @@ export default function RecorderPage() {
       </div>
 
       <div className="flex flex-wrap gap-4 justify-center">
-        {!screenActive ? (
-          <button onClick={startCapture} className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-xl font-medium transition-colors">
-            Share Screen
+        {!recording && !screenActive ? (
+          <button onClick={startCaptureAndRecord} className="px-6 py-3 bg-red-600 hover:bg-red-700 rounded-xl font-medium transition-colors">
+            Start Recording
           </button>
-        ) : (
-          <>
-            {!recording ? (
-              <button onClick={startRecording} className="px-6 py-3 bg-red-600 hover:bg-red-700 rounded-xl font-medium transition-colors">
-                Start Recording
-              </button>
-            ) : (
-              <button onClick={stopRecording} className="px-6 py-3 bg-yellow-600 hover:bg-yellow-700 rounded-xl font-medium transition-colors">
-                Stop Recording
-              </button>
-            )}
-            <button onClick={stopCapture} className="px-6 py-3 bg-gray-700 hover:bg-gray-600 rounded-xl font-medium transition-colors">
-              Stop Sharing
-            </button>
-          </>
-        )}
+        ) : recording ? (
+          <button onClick={stopRecording} className="px-6 py-3 bg-yellow-600 hover:bg-yellow-700 rounded-xl font-medium transition-colors">
+            Stop Recording
+          </button>
+        ) : null}
       </div>
 
       {recordedBlob && (
