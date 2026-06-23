@@ -216,7 +216,10 @@ export default function RecorderPage() {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({
+        name,
+        parents: folderId ? [folderId] : [],
+      }),
     });
     if (!fileRes.ok) {
       const err = await fileRes.text();
