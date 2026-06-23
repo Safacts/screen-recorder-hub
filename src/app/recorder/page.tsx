@@ -209,18 +209,14 @@ export default function RecorderPage() {
     window.location.href = "/api/auth";
   }, []);
 
-  async function uploadFile(accessToken: string, blob: Blob, name: string, folderId: string, mime: string) {
+  async function uploadFile(accessToken: string, blob: Blob, name: string, mime: string) {
     const fileRes = await fetch("https://www.googleapis.com/drive/v3/files", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        name,
-        parents: folderId ? [folderId] : [],
-      }),
-    });
+      body: JSON.stringify({ name }),
     if (!fileRes.ok) {
       const err = await fileRes.text();
       throw new Error(`Create ${name} failed: ${err}`);
@@ -253,11 +249,11 @@ export default function RecorderPage() {
       const { accessToken, folderId } = await res.json();
 
       const timestamp = Date.now();
-      await uploadFile(accessToken, recordedBlob, `recording-${timestamp}.webm`, folderId, "video/webm");
+      await uploadFile(accessToken, recordedBlob, `recording-${timestamp}.webm`, "video/webm");
 
       if (markers.length > 0) {
         const markersBlob = new Blob([JSON.stringify(markers, null, 2)], { type: "application/json" });
-        await uploadFile(accessToken, markersBlob, `recording-${timestamp}-markers.json`, folderId, "application/json");
+        await uploadFile(accessToken, markersBlob, `recording-${timestamp}-markers.json`, "application/json");
       }
 
       setDriveUploaded(true);
