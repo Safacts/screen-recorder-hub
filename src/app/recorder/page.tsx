@@ -209,6 +209,41 @@ export default function RecorderPage() {
     window.location.href = "/api/auth";
   }, []);
 
+  async function uploadFile(accessToken: string, blob: Blob, name: string, folderId: string, mime: string) {
+    const fileRes = await fetch("https://www.googleapis.com/drive/v3/files", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name,
+        parents: folderId ? [folderId] : [],
+      }),
+    });
+    if (!fileRes.ok) {
+      const err = await fileRes.text();
+      throw new Error(`Create ${name} failed: ${err}`);
+    }
+    const { id } = await fileRes.json();
+
+    const uploadRes = await fetch(
+      `https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=media`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": mime,
+        },
+        body: blob,
+      }
+    );
+    if (!uploadRes.ok) {
+      const err = await uploadRes.text();
+      throw new Error(`Upload ${name} failed: ${err}`);
+    }
+  }
+
   const uploadToDrive = useCallback(async () => {
     if (!recordedBlob) return;
     setDriveUploading(true);
@@ -218,54 +253,11 @@ export default function RecorderPage() {
       const { accessToken, folderId } = await res.json();
 
       const timestamp = Date.now();
-      const parents = folderId ? [folderId] : [];
-
-      const videoMetadata = {
-        name: `recording-${timestamp}.webm`,
-        parents,
-      };
-
-      const videoForm = new FormData();
-      videoForm.append(
-        "metadata",
-        new Blob([JSON.stringify(videoMetadata)], { type: "application/json" })
-      );
-      videoForm.append("file", recordedBlob, videoMetadata.name);
-
-      const videoRes = await fetch(
-        "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${accessToken}` },
-          body: videoForm,
-        }
-      );
-      if (!videoRes.ok) throw new Error("Video upload failed");
+      await uploadFile(accessToken, recordedBlob, `recording-${timestamp}.webm`, folderId, "video/webm");
 
       if (markers.length > 0) {
-        const markerMetadata = {
-          name: `recording-${timestamp}-markers.json`,
-          parents,
-        };
-        const markerForm = new FormData();
-        markerForm.append(
-          "metadata",
-          new Blob([JSON.stringify(markerMetadata)], { type: "application/json" })
-        );
-        markerForm.append(
-          "file",
-          new Blob([JSON.stringify(markers, null, 2)], { type: "application/json" }),
-          markerMetadata.name
-        );
-        const markerRes = await fetch(
-          "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
-          {
-            method: "POST",
-            headers: { Authorization: `Bearer ${accessToken}` },
-            body: markerForm,
-          }
-        );
-        if (!markerRes.ok) throw new Error("Markers upload failed");
+        const markersBlob = new Blob([JSON.stringify(markers, null, 2)], { type: "application/json" });
+        await uploadFile(accessToken, markersBlob, `recording-${timestamp}-markers.json`, folderId, "application/json");
       }
 
       setDriveUploaded(true);
