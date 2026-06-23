@@ -22,6 +22,9 @@ export default function RecorderPage() {
   const [elapsed, setElapsed] = useState(0);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [screenActive, setScreenActive] = useState(false);
+  const [driveAuth, setDriveAuth] = useState<"unauthorized" | "authorized" | "error">("unauthorized");
+  const [driveUploading, setDriveUploading] = useState(false);
+  const [driveUploaded, setDriveUploaded] = useState(false);
 
   useEffect(() => {
     const peer = new Peer(generateId(), {
@@ -66,6 +69,17 @@ export default function RecorderPage() {
     return () => {
       peer.destroy();
     };
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("drive") === "ready") {
+      setDriveAuth("authorized");
+      window.history.replaceState({}, "", "/recorder");
+    } else if (params.get("drive") === "error") {
+      setDriveAuth("error");
+      window.history.replaceState({}, "", "/recorder");
+    }
   }, []);
 
   const startCapture = useCallback(async () => {
@@ -189,6 +203,77 @@ export default function RecorderPage() {
     }
   }, [recordedBlob, markers]);
 
+  const authorizeDrive = useCallback(() => {
+    window.location.href = "/api/auth";
+  }, []);
+
+  const uploadToDrive = useCallback(async () => {
+    if (!recordedBlob) return;
+    setDriveUploading(true);
+    try {
+      const res = await fetch("/api/drive/upload", { method: "POST" });
+      if (!res.ok) throw new Error("Auth failed");
+      const { accessToken, folderId } = await res.json();
+
+      const timestamp = Date.now();
+      const parents = folderId ? [folderId] : [];
+
+      const videoMetadata = {
+        name: `recording-${timestamp}.webm`,
+        parents,
+      };
+
+      const videoForm = new FormData();
+      videoForm.append(
+        "metadata",
+        new Blob([JSON.stringify(videoMetadata)], { type: "application/json" })
+      );
+      videoForm.append("file", recordedBlob, videoMetadata.name);
+
+      const videoRes = await fetch(
+        "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${accessToken}` },
+          body: videoForm,
+        }
+      );
+      if (!videoRes.ok) throw new Error("Video upload failed");
+
+      if (markers.length > 0) {
+        const markerMetadata = {
+          name: `recording-${timestamp}-markers.json`,
+          parents,
+        };
+        const markerForm = new FormData();
+        markerForm.append(
+          "metadata",
+          new Blob([JSON.stringify(markerMetadata)], { type: "application/json" })
+        );
+        markerForm.append(
+          "file",
+          new Blob([JSON.stringify(markers, null, 2)], { type: "application/json" }),
+          markerMetadata.name
+        );
+        const markerRes = await fetch(
+          "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${accessToken}` },
+            body: markerForm,
+          }
+        );
+        if (!markerRes.ok) throw new Error("Markers upload failed");
+      }
+
+      setDriveUploaded(true);
+    } catch {
+      setDriveAuth("error");
+    } finally {
+      setDriveUploading(false);
+    }
+  }, [recordedBlob, markers]);
+
   return (
     <main className="flex min-h-screen flex-col items-center p-4 sm:p-8 gap-6">
       <h1 className="text-2xl font-bold">Recorder</h1>
@@ -245,6 +330,27 @@ export default function RecorderPage() {
           <button onClick={download} className="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-xl font-medium transition-colors">
             Download Recording ({Math.round(recordedBlob.size / 1024 / 1024 * 10) / 10} MB)
           </button>
+
+          {driveAuth === "unauthorized" && (
+            <button onClick={authorizeDrive} className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-xl font-medium transition-colors">
+              Authorize Google Drive
+            </button>
+          )}
+          {driveAuth === "authorized" && !driveUploaded && (
+            <button onClick={uploadToDrive} disabled={driveUploading} className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800/50 rounded-xl font-medium transition-colors">
+              {driveUploading ? "Uploading..." : "Upload to Google Drive"}
+            </button>
+          )}
+          {driveAuth === "authorized" && driveUploaded && (
+            <span className="px-6 py-3 bg-green-900 text-green-400 rounded-xl font-medium">
+              Uploaded to Google Drive ✓
+            </span>
+          )}
+          {driveAuth === "error" && (
+            <span className="px-6 py-3 bg-red-900 text-red-400 rounded-xl font-medium">
+              Google Drive error — reauthorize
+            </span>
+          )}
 
           <video controls src={URL.createObjectURL(recordedBlob)} className="w-full rounded-xl border border-gray-700" />
         </div>

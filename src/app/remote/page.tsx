@@ -5,6 +5,27 @@ import Peer from "peerjs";
 import { Marker, PeerMessage } from "@/lib/types";
 import { formatTime } from "@/lib/utils";
 
+function generateSimpleQRCode(text: string, size: number = 120): string {
+  const modules = Math.ceil(Math.sqrt(text.length));
+  const moduleSize = Math.floor(size / modules);
+  let qr = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">`;
+
+  for (let row = 0; row < modules; row++) {
+    for (let col = 0; col < modules; col++) {
+      const index = row * modules + col;
+      const charCode = text.charCodeAt(index % text.length);
+      const isDark = (charCode + row + col) % 2 === 0;
+
+      if (isDark) {
+        qr += `<rect x="${col * moduleSize}" y="${row * moduleSize}" width="${moduleSize}" height="${moduleSize}" fill="#000"/>`;
+      }
+    }
+  }
+
+  qr += `</svg>`;
+  return qr;
+}
+
 export default function RemotePage() {
   const peerRef = useRef<Peer | null>(null);
   const connRef = useRef<ReturnType<Peer["connect"]> | null>(null);
@@ -94,15 +115,31 @@ export default function RemotePage() {
       {!sessionActive ? (
         <div className="flex flex-col items-center gap-6 w-full max-w-sm">
           <div className="text-center space-y-2">
-            <p className="text-sm text-gray-400">Enter the ID shown on the recorder laptop:</p>
-            <input
-              type="text"
-              value={inputId}
-              onChange={(e) => setInputId(e.target.value.toUpperCase())}
-              placeholder="e.g. ABC123"
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-xl text-center text-xl font-mono uppercase tracking-widest focus:outline-none focus:border-blue-500"
-              maxLength={6}
-            />
+            <p className="text-sm text-gray-400">Enter the ID shown on the recorder laptop OR scan QR code:</p>
+
+            <div className="flex flex-col items-center gap-4">
+              {myId && (
+                <div className="bg-white p-4 rounded-lg">
+                  <div
+                    dangerouslySetInnerHTML={{
+                      __html: generateSimpleQRCode(myId, 120),
+                    }}
+                  />
+                  <p className="text-xs text-center mt-2 font-mono text-gray-600">
+                    {myId}
+                  </p>
+                </div>
+              )}
+
+              <input
+                type="text"
+                value={inputId}
+                onChange={(e) => setInputId(e.target.value.toUpperCase())}
+                placeholder="e.g. ABC123"
+                className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-xl text-center text-xl font-mono uppercase tracking-widest focus:outline-none focus:border-blue-500"
+                maxLength={6}
+              />
+            </div>
           </div>
 
           <button
