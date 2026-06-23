@@ -11,7 +11,6 @@ export async function POST() {
 
   const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
   const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-  const FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID;
 
   if (!CLIENT_ID || !CLIENT_SECRET) {
     return NextResponse.json({ error: "Google Drive not configured" }, { status: 500 });
@@ -35,8 +34,5 @@ export async function POST() {
     return NextResponse.json({ error: "Token refresh failed" }, { status: 401 });
   }
 
-  return NextResponse.json({
-    accessToken: tokens.access_token,
-    folderId: FOLDER_ID || "",
-  });
+  return NextResponse.json({ accessToken: tokens.access_token });
 }

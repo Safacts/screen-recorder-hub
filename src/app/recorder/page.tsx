@@ -220,6 +220,27 @@ export default function RecorderPage() {
     window.location.href = "/api/auth";
   }, []);
 
+  async function ensureFolder(accessToken: string): Promise<string> {
+    const saved = localStorage.getItem("drive_folder_id");
+    if (saved) return saved;
+
+    const res = await fetch("https://www.googleapis.com/drive/v3/files", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: "Screen Recordings",
+        mimeType: "application/vnd.google-apps.folder",
+      }),
+    });
+    if (!res.ok) throw new Error("Failed to create folder");
+    const { id } = await res.json();
+    localStorage.setItem("drive_folder_id", id);
+    return id;
+  }
+
   async function uploadFile(accessToken: string, blob: Blob, name: string, mime: string, folderId: string) {
     const fileRes = await fetch("https://www.googleapis.com/drive/v3/files", {
       method: "POST",
@@ -227,10 +248,7 @@ export default function RecorderPage() {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        name,
-        parents: folderId ? [folderId] : [],
-      }),
+      body: JSON.stringify({ name, parents: [folderId] }),
     });
     if (!fileRes.ok) {
       const err = await fileRes.text();
@@ -261,8 +279,9 @@ export default function RecorderPage() {
     try {
       const res = await fetch("/api/drive/upload", { method: "POST" });
       if (!res.ok) throw new Error("Auth failed");
-      const { accessToken, folderId } = await res.json();
+      const { accessToken } = await res.json();
 
+      const folderId = await ensureFolder(accessToken);
       const timestamp = Date.now();
       await uploadFile(accessToken, recordedBlob, `recording-${timestamp}.webm`, "video/webm", folderId);
 

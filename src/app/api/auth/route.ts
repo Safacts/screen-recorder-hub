@@ -10,7 +10,7 @@ export async function GET() {
     client_id: CLIENT_ID,
     redirect_uri: "https://screen-recorder-hub.vercel.app/api/auth/callback",
     response_type: "code",
-    scope: "https://www.googleapis.com/auth/drive",
+    scope: "https://www.googleapis.com/auth/drive.file",
     access_type: "offline",
     prompt: "consent",
   });
